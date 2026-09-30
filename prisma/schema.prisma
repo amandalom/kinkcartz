@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Self-referencing so a Category can be top-level (parentId null)
+// or a sub-category nested under one parent.
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  sortOrder   Int        @default(0)
+  parentId    String?
+  parent      Category?  @relation("CategoryToSub", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryToSub")
+  products    Product[]
+
+  @@index([parentId])
+}
+
+model Product {
+  id             String           @id @default(cuid())
+  name           String
+  slug           String           @unique
+  description    String
+  priceCents     Int
+  compareAtCents Int?
+  sku            String           @unique
+  categoryId     String
+  category       Category         @relation(fields: [categoryId], references: [id])
+  material       String?
+  powerSource    String? // e.g. "Rechargeable (USB-C)", "Battery (2x AAA)", "Manual"
+  audience       String           @default("all") // "all" | "sub" | "dom" | "couples"
+  tags           String? // comma-separated display badges, e.g. "Severe Calibration,Hand-Finished"
+  discreetShip   Boolean          @default(true)
+  featured       Boolean          @default(false)
+  active         Boolean          @default(true)
+  images         ProductImage[]
+  variants       ProductVariant[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([categoryId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String
+  sortOrder Int     @default(0)
+}
+
+// e.g. size / color options that change price or SKU
+model ProductVariant {
+  id           String  @id @default(cuid())
+  productId    String
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name         String // "Size" / "Color" / "Length"
+  value        String // "Medium" / "Black" / "6 inch"
+  priceDeltaCents Int  @default(0)
+  sku          String  @unique
+  stock        Int     @default(0)
+}
+
+// Created on checkout submit. No payment capture happens here —
+// see README for why a live payment processor isn't wired up.
+model Order {
+  id                String      @id @default(cuid())
+  email             String
+  shippingName      String
+  shippingAddress1  String
+  shippingAddress2  String?
+  shippingCity      String
+  shippingState     String
+  shippingZip       String
+  shippingCountry   String
+  totalCents        Int
+  status            String      @default("pending_payment")
+  billingDescriptor String      @default("KCZ* RETAIL")
+  items             OrderItem[]
+  createdAt         DateTime    @default(now())
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  name       String
+  priceCents Int
+  quantity   Int
+}
