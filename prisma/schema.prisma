@@ -1,5 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Netlify's build container and the actual Functions runtime container
+  // aren't necessarily the same OS/libc — without explicit targets, Prisma
+  // only ships the engine binary for whatever ran `prisma generate`, which
+  // can 500 at request time on a binary that's missing for the runtime.
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "rhel-openssl-1.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
