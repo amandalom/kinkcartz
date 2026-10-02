@@ -1,7 +1,7 @@
 # kinkcartz
 
 Adults-only storefront for bondage gear, impact/sensation toys, pleasure
-devices, and fetish clothing. Next.js 16 (App Router) + Prisma/SQLite +
+devices, and fetish clothing. Next.js 16 (App Router) + Prisma/Postgres +
 Tailwind + Zustand.
 
 ## Category taxonomy
@@ -59,10 +59,14 @@ isn't linked from anywhere in the shopper-facing UI.
 
 ## Running it locally
 
+Needs a Postgres database — a free [Neon](https://neon.tech) or
+[Supabase](https://supabase.com) project both work. Put the connection
+string in `.env` as `DATABASE_URL`.
+
 ```bash
 npm install
-npm run db:push   # creates prisma/dev.db from schema.prisma
-npm run db:seed   # loads the taxonomy + 70 sample products (2 per sub-category)
+npm run db:push   # creates the schema in your Postgres database
+npm run db:seed   # loads the taxonomy + 280 sample products (8 per sub-category)
 npm run dev        # http://localhost:3000
 ```
 
@@ -80,17 +84,47 @@ excluded from the age-gate.
 - Session is a signed, httpOnly cookie (`ADMIN_SESSION_SECRET` in `.env`),
   12-hour expiry, checked in `proxy.ts` for every `/admin` and `/api/admin`
   request.
-- Photo uploads write to `public/uploads/` on the server's local disk via
-  `lib/admin-actions.ts` (`addProductImage`). This works as-is for local
-  use or a normal VPS. It will **not** work on Vercel or similar serverless
-  hosts — their filesystem is read-only/ephemeral at request time — so if
-  you deploy there, swap that function to upload to S3/R2/Cloudinary/etc.
-  instead of local disk.
+- Photo uploads go through `lib/image-storage.ts`, which auto-detects where
+  it's running: local `next dev`/a VPS writes straight to `public/uploads/`
+  on disk (unchanged); on Netlify (detected via the `NETLIFY` env var it
+  sets automatically) uploads go to **Netlify Blobs** instead, served back
+  out through `app/api/blob-images/[key]/route.ts`, since serverless hosts
+  have a read-only/ephemeral filesystem at request time. No config needed
+  either way — it just works once deployed on Netlify.
 - There's no login rate-limiting. Fine for a solo-admin dev setup; add it
   (or put the whole `/admin` path behind your host's own auth/IP allowlist)
   before running this anywhere public.
 - Product variants (`ProductVariant` — sizes/colors) and category
   management aren't in the admin UI yet, only base product fields + photos.
+
+## Deploying to Netlify
+
+1. **Database.** Create a free [Neon](https://neon.tech) or
+   [Supabase](https://supabase.com) Postgres project (same one you used
+   locally works fine, or spin up a separate prod database). Copy its
+   connection string.
+2. **Connect the repo.** In Netlify: Add new site → Import an existing
+   project → pick this GitHub repo. `netlify.toml` already points it at
+   `@netlify/plugin-nextjs`, so build settings don't need manual setup.
+3. **Environment variables** (Site configuration → Environment variables):
+   - `DATABASE_URL` — the Postgres connection string from step 1
+   - `ADMIN_PASSWORD` — a real password, not the `changeme-admin` placeholder
+   - `ADMIN_SESSION_SECRET` — a random secret (`openssl rand -hex 32`, or
+     reuse the one from your local `.env` — rotating it just signs
+     everyone out)
+   - `NODE_ENV=production` (Netlify usually sets this itself; confirm it's set)
+4. **Enable Netlify Blobs** — it's on by default for all sites, nothing to
+   turn on. Photo uploads through `/admin` will land there automatically
+   once deployed (see the Admin panel section above).
+5. **First deploy won't have data.** Either run `npm run db:push && npm run
+   db:seed` locally against the *production* `DATABASE_URL` once, or do it
+   from Netlify's own shell if you have one. The build itself does not seed
+   data — `netlify.toml`'s build command only runs `prisma generate` + `next
+   build`.
+6. **Before this is real:** re-read "What I deliberately did NOT build, and
+   why" below — payments, real age verification, and content-policy review
+   with your processor and with Netlify's own Acceptable Use Policy are
+   still unresolved, deploying doesn't change that.
 
 ## What's actually built
 
@@ -149,7 +183,7 @@ The UI states "discreet packaging" and "discreet billing descriptor" —
 copy only. You still need to: pick a fulfillment process that actually
 ships in unmarked boxes, and set the actual statement descriptor with
 your payment processor (`billingDescriptor` on the `Order` model defaults
-to `"KND* RETAIL"` as a placeholder — change it to whatever you register).
+to `"KCZ* RETAIL"` as a placeholder — change it to whatever you register).
 
 ### Accounts, inventory, email, search, reviews, admin UI
 None of this exists yet. There's no login, no stock tracking beyond a

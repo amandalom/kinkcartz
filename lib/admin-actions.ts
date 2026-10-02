@@ -4,10 +4,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, unlink } from "node:fs/promises";
-import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin-auth";
+import { saveUpload, deleteUpload } from "@/lib/image-storage";
 
 async function requireAdmin() {
   const token = (await cookies()).get(ADMIN_COOKIE)?.value;
@@ -140,18 +139,16 @@ export async function addProductImage(productId: string, formData: FormData) {
     throw new Error("Only JPEG, PNG, WEBP, or AVIF images are allowed.");
   }
 
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadsDir, { recursive: true });
   const filename = `${randomUUID()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadsDir, filename), buffer);
+  const url = await saveUpload(filename, buffer);
 
   const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
   const count = await prisma.productImage.count({ where: { productId } });
   await prisma.productImage.create({
     data: {
       productId,
-      url: `/uploads/${filename}`,
+      url,
       alt: product.name,
       sortOrder: count,
     },
@@ -168,10 +165,7 @@ export async function removeProductImage(imageId: string) {
     include: { product: true },
   });
   await prisma.productImage.delete({ where: { id: imageId } });
-
-  if (image.url.startsWith("/uploads/")) {
-    await unlink(path.join(process.cwd(), "public", image.url)).catch(() => {});
-  }
+  await deleteUpload(image.url);
 
   revalidatePath(`/admin/products/${image.productId}/edit`);
   revalidatePath(`/product/${image.product.slug}`);
