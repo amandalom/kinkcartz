@@ -158,6 +158,40 @@ export async function addProductImage(productId: string, formData: FormData) {
   revalidatePath(`/product/${product.slug}`);
 }
 
+const ORDER_STATUSES = new Set(["pending_payment", "paid", "fulfilled", "cancelled"]);
+
+export async function updateOrderStatus(orderId: string, formData: FormData) {
+  await requireAdmin();
+  const status = String(formData.get("status") ?? "");
+  if (!ORDER_STATUSES.has(status)) {
+    throw new Error("Invalid status.");
+  }
+  await prisma.order.update({ where: { id: orderId }, data: { status } });
+  revalidatePath("/admin/orders");
+}
+
+export async function updatePaymentSettings(formData: FormData) {
+  await requireAdmin();
+  const data = {
+    bitcoinEnabled: formData.get("bitcoinEnabled") === "on",
+    bitcoinAddress: String(formData.get("bitcoinAddress") ?? "").trim() || null,
+    cashappEnabled: formData.get("cashappEnabled") === "on",
+    cashappHandle: String(formData.get("cashappHandle") ?? "").trim() || null,
+    paypalEnabled: formData.get("paypalEnabled") === "on",
+    paypalHandle: String(formData.get("paypalHandle") ?? "").trim() || null,
+    venmoEnabled: formData.get("venmoEnabled") === "on",
+    venmoHandle: String(formData.get("venmoHandle") ?? "").trim() || null,
+    zelleEnabled: formData.get("zelleEnabled") === "on",
+    zelleHandle: String(formData.get("zelleHandle") ?? "").trim() || null,
+  };
+  await prisma.paymentSettings.upsert({
+    where: { id: "default" },
+    create: { id: "default", ...data },
+    update: data,
+  });
+  revalidatePath("/admin/settings");
+}
+
 export async function removeProductImage(imageId: string) {
   await requireAdmin();
   const image = await prisma.productImage.findUniqueOrThrow({

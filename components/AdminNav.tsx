@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-export function AdminNav() {
+export function AdminNav({ pendingOrderCount = 0 }: { pendingOrderCount?: number }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -23,6 +23,23 @@ export function AdminNav() {
             className={`text-sm ${pathname.startsWith("/admin/products") ? "text-white" : "text-zinc-400 hover:text-white"}`}
           >
             Products
+          </Link>
+          <Link
+            href="/admin/orders"
+            className={`flex items-center gap-2 text-sm ${pathname.startsWith("/admin/orders") ? "text-white" : "text-zinc-400 hover:text-white"}`}
+          >
+            Orders
+            {pendingOrderCount > 0 && (
+              <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-white">
+                {pendingOrderCount}
+              </span>
+            )}
+          </Link>
+          <Link
+            href="/admin/settings"
+            className={`text-sm ${pathname.startsWith("/admin/settings") ? "text-white" : "text-zinc-400 hover:text-white"}`}
+          >
+            Settings
           </Link>
         </div>
         <div className="flex items-center gap-4">

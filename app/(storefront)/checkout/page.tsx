@@ -1,49 +1,75 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useCart } from "@/lib/cart-store";
 import { formatCents } from "@/lib/format";
 import { Eyebrow } from "@/components/Eyebrow";
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/lib/payment-methods";
+import type { PublicPaymentOption } from "@/lib/payment-settings";
 
 export default function CheckoutPage() {
-  const router = useRouter();
   const { items, clear } = useCart();
   const total = useCart((s) => s.totalCents());
   const [submitting, setSubmitting] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  // Cart (and its live totalCents()) gets cleared right after a successful
+  // order, so the confirmation screen needs its own frozen copy of the total.
+  const [orderTotal, setOrderTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const [options, setOptions] = useState<PublicPaymentOption[] | null>(null);
+  const [method, setMethod] = useState<PaymentMethod | "">("");
+  // Bitcoin payments can't be reversed once sent, so submitting with it
+  // selected shows a confirm step instead of placing the order immediately.
+  const [btcConfirming, setBtcConfirming] = useState(false);
+
+  function selectMethod(next: PaymentMethod) {
+    setMethod(next);
+    setBtcConfirming(false);
+  }
+
+  useEffect(() => {
+    fetch("/api/payment-settings")
+      .then((res) => res.json())
+      .then((data: { options: PublicPaymentOption[] }) => {
+        setOptions(data.options);
+        if (data.options.length === 1) setMethod(data.options[0].method);
+      })
+      .catch(() => setOptions([]));
+  }, []);
+
+  const selectedOption = options?.find((o) => o.method === method);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!method) {
+      setError("Choose a payment method.");
+      return;
+    }
+    if (method === "bitcoin" && !btcConfirming) {
+      setBtcConfirming(true);
+      return;
+    }
     setSubmitting(true);
     setError(null);
-    const form = new FormData(e.currentTarget);
+
+    // multipart, not JSON — Bitcoin orders attach a payment screenshot.
+    const formData = new FormData(e.currentTarget);
+    formData.set("items", JSON.stringify(items));
 
     const res = await fetch("/api/checkout", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: form.get("email"),
-        shipping: {
-          name: form.get("name"),
-          address1: form.get("address1"),
-          address2: form.get("address2"),
-          city: form.get("city"),
-          state: form.get("state"),
-          zip: form.get("zip"),
-          country: form.get("country"),
-        },
-        items,
-      }),
+      body: formData,
     });
 
     setSubmitting(false);
     if (!res.ok) {
-      setError("Something went wrong. Please try again.");
+      const body = await res.json().catch(() => null);
+      setError(body?.error || "Something went wrong. Please try again.");
       return;
     }
     const data = await res.json();
+    setOrderTotal(total);
     setOrderId(data.orderId);
     clear();
   }
@@ -53,9 +79,28 @@ export default function CheckoutPage() {
       <main className="mx-auto max-w-lg px-6 py-24 text-center">
         <h1 className="font-display text-2xl text-white">Order received</h1>
         <p className="mt-4 text-sm text-zinc-400">
-          Reference <span className="text-zinc-200">#{orderId.slice(-8)}</span>. This
-          demo does not process payment — no live processor is connected yet.
+          Reference <span className="text-zinc-200">#{orderId.slice(-8)}</span>.
         </p>
+        {method === "bitcoin" ? (
+          <div className="mt-6 rounded-xl border border-white/10 bg-surface p-5 text-left">
+            <h2 className="text-sm uppercase tracking-wide text-zinc-500">Pay via Bitcoin</h2>
+            <p className="mt-3 break-all rounded-lg bg-surface2 px-4 py-3 font-mono text-sm text-white">
+              {selectedOption?.bitcoinAddress || "Address not configured — contact support."}
+            </p>
+            <p className="mt-3 text-sm text-zinc-300">
+              We&apos;ve got your screenshot for the{" "}
+              <strong className="text-gold">{formatCents(orderTotal)}</strong> payment — we&apos;ll
+              double-check it and get your order packed and shipped as soon as it&apos;s confirmed.
+              We&apos;ll also email you this address and a link to check your order status.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-zinc-400">
+            We&apos;ll email you a secure magic link with{" "}
+            {method && PAYMENT_METHOD_LABELS[method as PaymentMethod]} payment instructions in a
+            few minutes. Your order ships as soon as we&apos;ve confirmed the payment came through.
+          </p>
+        )}
       </main>
     );
   }
@@ -73,8 +118,8 @@ export default function CheckoutPage() {
       <Eyebrow>Final Rite</Eyebrow>
       <h1 className="mt-1 font-display text-2xl text-white">Checkout</h1>
       <p className="mt-2 text-xs text-zinc-500">
-        Demo checkout — collects order &amp; shipping details only. No payment is
-        captured (see README for wiring a real, adult-friendly processor).
+        Pick a payment method below. We don&apos;t run cards — pay directly, and we confirm once
+        it arrives.
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-10 md:grid-cols-2">
@@ -105,15 +150,105 @@ export default function CheckoutPage() {
             className="w-full rounded-lg border border-white/10 bg-surface px-4 py-3 text-sm text-white placeholder:text-zinc-500"
           />
 
+          <div className="space-y-2 pt-2">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Payment method</p>
+            {options === null && <p className="text-sm text-zinc-500">Loading payment options…</p>}
+            {options?.length === 0 && (
+              <p className="text-sm text-accent">No payment methods are configured yet — contact the shop.</p>
+            )}
+            <div className="space-y-2">
+              {options?.map((opt) => (
+                <label
+                  key={opt.method}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm ${
+                    method === opt.method
+                      ? "border-accent bg-surface2 text-white"
+                      : "border-white/10 bg-surface text-zinc-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value={opt.method}
+                    checked={method === opt.method}
+                    onChange={() => selectMethod(opt.method)}
+                  />
+                  {PAYMENT_METHOD_LABELS[opt.method]}
+                </label>
+              ))}
+            </div>
+
+            {method === "bitcoin" && selectedOption && (
+              <div className="rounded-lg border border-white/10 bg-surface2 p-4">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">Bitcoin address</p>
+                <p className="mt-2 break-all font-mono text-sm text-white">
+                  {selectedOption.bitcoinAddress || "Address not configured — contact support."}
+                </p>
+              </div>
+            )}
+            {method && method !== "bitcoin" && (
+              <p className="text-xs text-zinc-500">
+                We&apos;ll send a secure magic link to your email with{" "}
+                {PAYMENT_METHOD_LABELS[method as PaymentMethod]} payment instructions once you
+                place the order.
+              </p>
+            )}
+          </div>
+
           {error && <p className="text-sm text-accent">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-full bg-accent px-6 py-3 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-          >
-            {submitting ? "Placing order…" : `Place order — ${formatCents(total)}`}
-          </button>
+          {btcConfirming ? (
+            <div className="space-y-3 rounded-lg border border-accent bg-surface2 p-4">
+              <p className="text-sm text-white">One last thing before we lock this in</p>
+              <p className="text-sm text-zinc-300">
+                Send <strong className="text-gold">{formatCents(total)}</strong> in BTC to the
+                address above, then come back here with a screenshot of the completed transaction
+                — that&apos;s how we confirm it went through, since there&apos;s no card for us to
+                charge. Bitcoin can&apos;t be undone once it&apos;s sent, so give the address one
+                more look before you do.
+              </p>
+              <div className="space-y-1.5">
+                <label className="text-xs uppercase tracking-wide text-zinc-500">
+                  Payment screenshot
+                </label>
+                <input
+                  type="file"
+                  name="paymentProof"
+                  accept="image/png,image/jpeg,image/webp"
+                  required
+                  className="w-full rounded-lg border border-white/10 bg-surface px-3 py-2.5 text-xs text-zinc-300 file:mr-3 file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-1.5 file:text-xs file:font-medium file:text-white file:hover:bg-accent/90"
+                />
+              </div>
+              <p className="text-xs text-zinc-500">
+                We&apos;ll ship your order as soon as we&apos;ve confirmed the payment came
+                through.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setBtcConfirming(false)}
+                  className="flex-1 rounded-full border border-white/15 px-6 py-3 text-sm text-zinc-300 hover:bg-white/5"
+                >
+                  Go back
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 rounded-full bg-accent px-6 py-3 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
+                >
+                  {submitting ? "Placing order…" : "Confirm & place order"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded-full bg-accent px-6 py-3 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
+            >
+              {submitting ? "Placing order…" : `Place order — ${formatCents(total)}`}
+            </button>
+          )}
         </form>
 
         <div className="rounded-xl border border-white/10 bg-surface p-5">

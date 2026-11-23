@@ -75,7 +75,9 @@ model ProductVariant {
 }
 
 // Created on checkout submit. No payment capture happens here —
-// see README for why a live payment processor isn't wired up.
+// see README for why a live payment processor isn't wired up. Customer
+// pays manually (Bitcoin address or a handle via the emailed magic link)
+// and an admin marks the order paid once funds show up.
 model Order {
   id                String      @id @default(cuid())
   email             String
@@ -89,8 +91,37 @@ model Order {
   totalCents        Int
   status            String      @default("pending_payment")
   billingDescriptor String      @default("KCZ* RETAIL")
+  paymentMethod     String      @default("bitcoin") // "bitcoin" | "cashapp" | "paypal" | "venmo" | "zelle"
+  // JSON snapshot of the address/handle shown to the customer at order
+  // time, so a later admin edit to PaymentSettings can't change what an
+  // already-placed order is expecting payment to.
+  paymentDetails    String?
+  magicTokenHash       String?
+  magicTokenExpiresAt  DateTime?
+  // Key into the private payment-proofs store (lib/payment-proof-storage.ts)
+  // — not a public URL, unlike ProductImage.url, since these screenshots
+  // can show wallet balances/transaction details. Served only through the
+  // admin-gated /api/admin/payment-proofs/[key] route.
+  paymentProofKey      String?
   items             OrderItem[]
   createdAt         DateTime    @default(now())
+}
+
+// Singleton (id is always "default") holding the admin-configured payment
+// destinations shown to customers at checkout / via the order magic link.
+model PaymentSettings {
+  id             String   @id @default("default")
+  bitcoinEnabled Boolean  @default(true)
+  bitcoinAddress String?
+  cashappEnabled Boolean  @default(false)
+  cashappHandle  String?
+  paypalEnabled  Boolean  @default(false)
+  paypalHandle   String?
+  venmoEnabled   Boolean  @default(false)
+  venmoHandle    String?
+  zelleEnabled   Boolean  @default(false)
+  zelleHandle    String?
+  updatedAt      DateTime @updatedAt
 }
 
 model OrderItem {

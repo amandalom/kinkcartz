@@ -132,6 +132,14 @@ excluded from the age-gate.
 - Product pages with material/power-source/SKU attributes.
 - A cart (Zustand + localStorage) and a checkout page that writes an
   `Order` + `OrderItem` row.
+- Manual payment methods: at checkout the customer picks Bitcoin, Cash App,
+  PayPal, Venmo, or Zelle (admin controls which are enabled and their
+  address/handle at `/admin/settings`). Bitcoin's address shows immediately
+  on-screen; the others are revealed via a secure "magic link" emailed to
+  the customer (`/orders/[id]?token=...`, `lib/order-link.ts`). Every order
+  shows up on `/admin/orders` regardless of email config, with a badge count
+  in the admin nav; admin also gets an email if `ADMIN_NOTIFICATION_EMAIL`
+  is set. See "Email" below.
 - An age-gate: every request is redirected to `/age-gate` until a cookie
   is set, enforced in `proxy.ts` (Next's server-side middleware/proxy), not
   just a client-side popup.
@@ -146,7 +154,16 @@ input (a payment provider agreement, a merchant account, possibly a
 lawyer), so I left them as clearly-marked stubs rather than guessing:
 
 ### Payment processing
-`app/api/checkout/route.ts` records the order but never charges a card.
+`app/api/checkout/route.ts` records the order but never charges a card —
+instead the customer pays manually via whichever method they picked
+(Bitcoin/Cash App/PayPal/Venmo/Zelle, see "What's actually built" above)
+and an admin marks the order `paid` on `/admin/orders` once funds show up.
+This sidesteps needing a merchant account at all, but it's manual-review
+all the way: nothing here verifies a Bitcoin tx confirmed on-chain or that
+a Cash App/PayPal/Venmo/Zelle payment actually landed — that's on the
+admin checking their own wallet/accounts against the order list. If you
+want automatic verification later (e.g. a Bitcoin node/API webhook, or
+PayPal's IPN), that's a bigger integration than this stub.
 Stripe, PayPal, and Square all prohibit sex toys / adult novelty items in
 their terms of service — accounts get shut down, sometimes with funds
 frozen. You'll need a **high-risk merchant account** through a processor
@@ -185,12 +202,18 @@ ships in unmarked boxes, and set the actual statement descriptor with
 your payment processor (`billingDescriptor` on the `Order` model defaults
 to `"KCZ* RETAIL"` as a placeholder — change it to whatever you register).
 
-### Accounts, inventory, email, search, reviews, admin UI
-None of this exists yet. There's no login, no stock tracking beyond a
-`stock` field on `ProductVariant` that nothing enforces, no order
-confirmation email, no search, no reviews. The `Order`/`OrderItem` models
-are there so an admin/fulfillment view has something to query, but no such
-view has been built. Say which of these matters next and I'll build it.
+### Email
+`lib/email.ts` posts to Resend's HTTP API if `RESEND_API_KEY` is set
+(`.env`); without it, emails are logged to the server console instead of
+sent, and nothing else breaks — orders still get recorded and still show
+on `/admin/orders`. Set `EMAIL_FROM` to a domain you've verified in Resend
+before relying on delivery, and `ADMIN_NOTIFICATION_EMAIL` if you want new
+orders emailed to you (the admin dashboard always shows them either way).
+
+### Accounts, inventory, search, reviews
+None of this exists yet. There's no login for customers, no stock tracking
+beyond a `stock` field on `ProductVariant` that nothing enforces, no
+search, no reviews. Say which of these matters next and I'll build it.
 
 ### Content moderation / legality by jurisdiction
 Some items in your list (e.g. certain restraint or medical-play products)

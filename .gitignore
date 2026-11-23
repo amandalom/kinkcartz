@@ -9,5 +9,6 @@ prisma/dev.db
 prisma/dev.db-journal
 public/uploads/*
 !public/uploads/stock-*.jpg
+/uploads
 .claude/settings.local.json
 *.tsbuildinfo
