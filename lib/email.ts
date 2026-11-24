@@ -7,9 +7,10 @@ type SendEmailInput = {
   subject: string;
   html: string;
   text: string;
+  attachments?: { filename: string; content: Buffer }[];
 };
 
-export async function sendEmail({ to, subject, html, text }: SendEmailInput): Promise<void> {
+export async function sendEmail({ to, subject, html, text, attachments }: SendEmailInput): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || "kinkcartz <orders@kinkcartz.example>";
 
@@ -27,7 +28,17 @@ export async function sendEmail({ to, subject, html, text }: SendEmailInput): Pr
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to, subject, html, text }),
+      body: JSON.stringify({
+        from,
+        to,
+        subject,
+        html,
+        text,
+        attachments: attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.content.toString("base64"),
+        })),
+      }),
     });
     if (!res.ok) {
       console.error(`[email] Resend API error ${res.status}: ${await res.text()}`);

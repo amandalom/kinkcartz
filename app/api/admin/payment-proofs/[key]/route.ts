@@ -11,7 +11,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
   }
 
   const ext = key.split(".").pop()?.toLowerCase();
-  const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+  const contentType =
+    ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "pdf" ? "application/pdf" : "image/jpeg";
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

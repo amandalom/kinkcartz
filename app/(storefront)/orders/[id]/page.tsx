@@ -12,10 +12,10 @@ export default async function OrderPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; proofUploaded?: string; proofError?: string }>;
 }) {
   const { id } = await params;
-  const { token } = await searchParams;
+  const { token, proofUploaded, proofError } = await searchParams;
 
   const order = await prisma.order.findUnique({
     where: { id },
@@ -81,9 +81,52 @@ export default async function OrderPage({
           <strong>#{order.id.slice(-8)}</strong> in the note/memo if possible.
         </p>
         <p className="mt-4 text-xs text-zinc-500">
-          We&apos;ll mark this order confirmed and get it shipped once payment arrives — no
-          further action needed if you&apos;ve already sent it.
+          Once you&apos;ve sent payment, upload a screenshot or receipt below — that&apos;s how we
+          confirm it went through and get your order shipped.
         </p>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-white/10 bg-surface p-5">
+        <h2 className="text-sm uppercase tracking-wide text-zinc-500">Payment proof</h2>
+        <p className="mt-2 text-sm text-zinc-400">
+          Upload a screenshot or receipt of your payment. This is what we use to confirm your
+          order — we can&apos;t mark it paid without it.
+        </p>
+
+        {proofUploaded && (
+          <p className="mt-3 text-sm text-gold">
+            Received — thanks! We&apos;ll confirm it and get your order moving.
+          </p>
+        )}
+        {proofError && <p className="mt-3 text-sm text-accent">{proofError}</p>}
+        {order.paymentProofKey && !proofUploaded && (
+          <p className="mt-3 text-sm text-zinc-300">
+            We already have a file on record for this order. Uploading another replaces it.
+          </p>
+        )}
+
+        <form
+          action={`/api/orders/${order.id}/proof`}
+          method="POST"
+          encType="multipart/form-data"
+          className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"
+        >
+          <input type="hidden" name="token" value={token} />
+          <input
+            type="file"
+            name="proof"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            required
+            className="flex-1 text-sm text-zinc-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-xs file:text-white file:hover:bg-white/15"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-accent px-6 py-2 text-sm font-medium text-white hover:bg-accent/90"
+          >
+            Upload
+          </button>
+        </form>
+        <p className="mt-2 text-xs text-zinc-600">JPEG, PNG, WEBP, or PDF — up to 5MB.</p>
       </div>
 
       <div className="mt-8">

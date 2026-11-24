@@ -81,3 +81,32 @@ export function buildAdminNotificationEmail(params: {
     text,
   };
 }
+
+export function buildProofUploadedEmail(params: {
+  order: OrderEmailOrder;
+  adminOrderLink: string;
+}) {
+  const method = params.order.paymentMethod as PaymentMethod;
+  const label = PAYMENT_METHOD_LABELS[method] ?? method;
+  const amount = formatCents(params.order.totalCents);
+  const shortId = params.order.id.slice(-8);
+
+  const html = `
+    <p>Payment proof uploaded for order <strong>#${shortId}</strong> — <strong>${amount}</strong> via <strong>${label}</strong>.</p>
+    <p>Customer: ${params.order.email}</p>
+    <p>The file is attached to this email, and also viewable from the order's admin page.</p>
+    <p><a href="${params.adminOrderLink}">Review order #${shortId}</a></p>
+  `.trim();
+
+  const text = [
+    `Payment proof uploaded for order #${shortId} — ${amount} via ${label}.`,
+    `Customer: ${params.order.email}`,
+    `File is attached. Review: ${params.adminOrderLink}`,
+  ].join("\n");
+
+  return {
+    subject: `Payment proof uploaded — order #${shortId}`,
+    html,
+    text,
+  };
+}
