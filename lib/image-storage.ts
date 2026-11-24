@@ -3,10 +3,15 @@ import path from "node:path";
 
 // Local `next dev` writes straight to disk (public/uploads), same as
 // before. On Netlify, the filesystem is read-only/ephemeral at runtime, so
-// uploads go to Netlify Blobs instead — auto-detected via the NETLIFY env
-// var Netlify sets on every build and function invocation; no manual
-// config needed there.
-const onNetlify = process.env.NETLIFY === "true";
+// uploads go to Netlify Blobs instead. NETLIFY=true is only set in
+// Netlify's *build* environment, not forwarded into the deployed
+// function's runtime — checking it here always came back false in
+// production, silently falling through to writeFile() against the
+// function's read-only filesystem (crashing with a 500) instead of
+// Netlify Blobs. NETLIFY_BLOBS_CONTEXT (what @netlify/blobs itself needs
+// to auto-configure) and AWS_LAMBDA_FUNCTION_NAME (set for any Netlify
+// Function, Next.js SSR included) are both actually present there.
+const onNetlify = Boolean(process.env.NETLIFY_BLOBS_CONTEXT || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
 export async function saveUpload(filename: string, buffer: Buffer): Promise<string> {
   if (onNetlify) {

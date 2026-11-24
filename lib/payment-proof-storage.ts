@@ -7,7 +7,14 @@ import path from "node:path";
 // ID, or other account details, so this stays admin-gated — see
 // app/api/admin/payment-proofs/[key]/route.ts. Local dev writes outside
 // public/ entirely so there's no public static path to it either.
-const onNetlify = process.env.NETLIFY === "true";
+// process.env.NETLIFY is only set in Netlify's *build* environment, not
+// forwarded into the deployed function's runtime — checking it here always
+// came back false in production, silently falling through to writeFile()
+// against the function's read-only filesystem (crashing with a 500) rather
+// than Netlify Blobs. NETLIFY_BLOBS_CONTEXT (what @netlify/blobs itself
+// needs to auto-configure) and AWS_LAMBDA_FUNCTION_NAME (set for any
+// Netlify Function, Next.js SSR included) are both actually present there.
+const onNetlify = Boolean(process.env.NETLIFY_BLOBS_CONTEXT || process.env.AWS_LAMBDA_FUNCTION_NAME);
 const STORE_NAME = "payment-proofs";
 
 export async function savePaymentProof(filename: string, buffer: Buffer): Promise<string> {
