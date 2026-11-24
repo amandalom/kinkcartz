@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin-auth";
 
 const AGE_COOKIE = "age_verified";
-const EXEMPT_PATHS = ["/age-gate", "/_next", "/favicon.ico", "/api/age-gate"];
+// /orders/[id] is only reachable with a signed magic-link token (anything
+// else shows "link invalid or expired"), so it's exempted from the age
+// gate — a customer clicking their emailed payment link shouldn't have to
+// re-confirm their age to see it.
+const EXEMPT_PATHS = ["/age-gate", "/_next", "/favicon.ico", "/api/age-gate", "/orders"];
 const ADMIN_LOGIN_PATHS = ["/admin/login", "/api/admin/login"];
 
 export async function proxy(req: NextRequest) {
