@@ -8,7 +8,22 @@ export async function GET() {
     const store = getStore("debug-test");
     await store.set("ping", "pong");
     const value = await store.get("ping");
-    return NextResponse.json({ ok: true, value, netlifyEnv: process.env.NETLIFY ?? null });
+    const candidateVars = [
+      "NETLIFY",
+      "NETLIFY_DEV",
+      "CONTEXT",
+      "SITE_ID",
+      "SITE_NAME",
+      "DEPLOY_ID",
+      "DEPLOY_URL",
+      "URL",
+      "AWS_LAMBDA_FUNCTION_NAME",
+      "NETLIFY_BLOBS_CONTEXT",
+      "NODE_ENV",
+    ];
+    const env: Record<string, string | null> = {};
+    for (const k of candidateVars) env[k] = process.env[k] ?? null;
+    return NextResponse.json({ ok: true, value, env });
   } catch (err) {
     return NextResponse.json(
       {
