@@ -187,6 +187,7 @@ async function getOrigin(): Promise<string> {
 export async function sendPaymentDetails(orderId: string, formData: FormData) {
   await requireAdmin();
   const destination = String(formData.get("destination") ?? "").trim();
+  const accountName = String(formData.get("accountName") ?? "").trim() || null;
   if (!destination) {
     throw new Error("Enter a payment address/handle before sending.");
   }
@@ -194,7 +195,9 @@ export async function sendPaymentDetails(orderId: string, formData: FormData) {
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
   const method = order.paymentMethod as PaymentMethod;
   const paymentDetails = JSON.stringify(
-    method === "bitcoin" ? { address: destination } : { handle: destination }
+    method === "bitcoin"
+      ? { address: destination }
+      : { handle: destination, name: accountName }
   );
 
   const { token, hash, expiresAt } = await createOrderToken(order.id);
@@ -214,6 +217,7 @@ export async function sendPaymentDetails(orderId: string, formData: FormData) {
     order: updated,
     orderLink,
     bitcoinAddress: method === "bitcoin" ? destination : undefined,
+    accountName: method === "bitcoin" ? undefined : accountName,
   });
   await sendEmail(email);
 
@@ -227,12 +231,16 @@ export async function updatePaymentSettings(formData: FormData) {
     bitcoinAddress: String(formData.get("bitcoinAddress") ?? "").trim() || null,
     cashappEnabled: formData.get("cashappEnabled") === "on",
     cashappHandle: String(formData.get("cashappHandle") ?? "").trim() || null,
+    cashappAccountName: String(formData.get("cashappAccountName") ?? "").trim() || null,
     paypalEnabled: formData.get("paypalEnabled") === "on",
     paypalHandle: String(formData.get("paypalHandle") ?? "").trim() || null,
+    paypalAccountName: String(formData.get("paypalAccountName") ?? "").trim() || null,
     venmoEnabled: formData.get("venmoEnabled") === "on",
     venmoHandle: String(formData.get("venmoHandle") ?? "").trim() || null,
+    venmoAccountName: String(formData.get("venmoAccountName") ?? "").trim() || null,
     zelleEnabled: formData.get("zelleEnabled") === "on",
     zelleHandle: String(formData.get("zelleHandle") ?? "").trim() || null,
+    zelleAccountName: String(formData.get("zelleAccountName") ?? "").trim() || null,
   };
   await prisma.paymentSettings.upsert({
     where: { id: "default" },

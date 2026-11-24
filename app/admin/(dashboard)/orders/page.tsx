@@ -42,14 +42,16 @@ export default async function AdminOrdersPage() {
               const method = order.paymentMethod as PaymentMethod;
               const label = PAYMENT_METHOD_LABELS[method] ?? order.paymentMethod;
               const details = order.paymentDetails
-                ? (JSON.parse(order.paymentDetails) as { address?: string | null; handle?: string | null })
+                ? (JSON.parse(order.paymentDetails) as {
+                    address?: string | null;
+                    handle?: string | null;
+                    name?: string | null;
+                  })
                 : {};
-              const sentDestination = details.address ?? details.handle ?? null;
+              const defaults = buildPaymentDetailsSnapshot(method, paymentSettings);
               const defaultDestination =
-                sentDestination ??
-                buildPaymentDetailsSnapshot(method, paymentSettings).address ??
-                buildPaymentDetailsSnapshot(method, paymentSettings).handle ??
-                "";
+                details.address ?? details.handle ?? defaults.address ?? defaults.handle ?? "";
+              const defaultAccountName = details.name ?? defaults.name ?? "";
 
               return (
                 <tr key={order.id} className="bg-surface/40 align-top">
@@ -69,17 +71,25 @@ export default async function AdminOrdersPage() {
                   <td className="px-4 py-3 text-zinc-400">
                     <form
                       action={sendPaymentDetails.bind(null, order.id)}
-                      className="flex items-center gap-2"
+                      className="flex flex-col gap-1.5"
                     >
                       <input
                         name="destination"
                         defaultValue={defaultDestination}
                         placeholder={method === "bitcoin" ? "BTC address" : "Handle"}
-                        className="w-40 rounded-md border border-white/10 bg-surface2 px-2 py-1 font-mono text-xs text-white placeholder:text-zinc-600"
+                        className="w-44 rounded-md border border-white/10 bg-surface2 px-2 py-1 font-mono text-xs text-white placeholder:text-zinc-600"
                       />
+                      {method !== "bitcoin" && (
+                        <input
+                          name="accountName"
+                          defaultValue={defaultAccountName}
+                          placeholder="Account name (optional)"
+                          className="w-44 rounded-md border border-white/10 bg-surface2 px-2 py-1 text-xs text-white placeholder:text-zinc-600"
+                        />
+                      )}
                       <button
                         type="submit"
-                        className="whitespace-nowrap rounded-md border border-white/15 px-2 py-1 text-xs text-zinc-300 hover:bg-white/5"
+                        className="w-fit whitespace-nowrap rounded-md border border-white/15 px-2 py-1 text-xs text-zinc-300 hover:bg-white/5"
                       >
                         {order.paymentDetailsSentAt ? "Resend" : "Send"}
                       </button>

@@ -49,6 +49,15 @@ export default async function AdminSettingsPage() {
               className={field}
             />
           </div>
+          <div className="space-y-1.5">
+            <label className={label}>Account name shown on Cash App</label>
+            <input
+              name="cashappAccountName"
+              placeholder="Name on the account"
+              defaultValue={settings.cashappAccountName ?? ""}
+              className={field}
+            />
+          </div>
         </fieldset>
 
         <fieldset className="space-y-3 rounded-xl border border-white/10 p-5">
@@ -62,6 +71,15 @@ export default async function AdminSettingsPage() {
               name="paypalHandle"
               placeholder="paypal.me/yourhandle"
               defaultValue={settings.paypalHandle ?? ""}
+              className={field}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className={label}>Account name shown on PayPal</label>
+            <input
+              name="paypalAccountName"
+              placeholder="Name on the account"
+              defaultValue={settings.paypalAccountName ?? ""}
               className={field}
             />
           </div>
@@ -81,6 +99,15 @@ export default async function AdminSettingsPage() {
               className={field}
             />
           </div>
+          <div className="space-y-1.5">
+            <label className={label}>Account name shown on Venmo</label>
+            <input
+              name="venmoAccountName"
+              placeholder="Name on the account"
+              defaultValue={settings.venmoAccountName ?? ""}
+              className={field}
+            />
+          </div>
         </fieldset>
 
         <fieldset className="space-y-3 rounded-xl border border-white/10 p-5">
@@ -94,6 +121,15 @@ export default async function AdminSettingsPage() {
               name="zelleHandle"
               placeholder="you@example.com"
               defaultValue={settings.zelleHandle ?? ""}
+              className={field}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className={label}>Account name shown on Zelle</label>
+            <input
+              name="zelleAccountName"
+              placeholder="Name on the account"
+              defaultValue={settings.zelleAccountName ?? ""}
               className={field}
             />
           </div>

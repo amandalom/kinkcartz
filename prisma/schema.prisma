@@ -119,12 +119,19 @@ model PaymentSettings {
   bitcoinAddress String?
   cashappEnabled Boolean  @default(false)
   cashappHandle  String?
+  // Account-holder name shown on the receiving end (e.g. the name that
+  // appears on the Cash App profile) — lets the customer confirm they're
+  // paying the right person/account before sending money.
+  cashappAccountName String?
   paypalEnabled  Boolean  @default(false)
   paypalHandle   String?
+  paypalAccountName  String?
   venmoEnabled   Boolean  @default(false)
   venmoHandle    String?
+  venmoAccountName   String?
   zelleEnabled   Boolean  @default(false)
   zelleHandle    String?
+  zelleAccountName   String?
   updatedAt      DateTime @updatedAt
 }
 

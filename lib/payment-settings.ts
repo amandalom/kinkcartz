@@ -43,23 +43,25 @@ export function isMethodEnabled(method: PaymentMethod, settings: PaymentSettings
   }
 }
 
-// Frozen onto the Order at checkout time so a later admin edit to
-// PaymentSettings can't change what an already-placed order is expecting
-// payment to.
+// Default address/handle (+ account-holder name, where that concept
+// applies) an admin's per-order "Send payment details" form is pre-filled
+// with — not written to the Order until an admin actually sends it, so a
+// later edit here can't change what an already-sent order told the
+// customer.
 export function buildPaymentDetailsSnapshot(
   method: PaymentMethod,
   settings: PaymentSettings
-): Record<string, string | null> {
+): { address?: string | null; handle?: string | null; name?: string | null } {
   switch (method) {
     case "bitcoin":
       return { address: settings.bitcoinAddress ?? null };
     case "cashapp":
-      return { handle: settings.cashappHandle ?? null };
+      return { handle: settings.cashappHandle ?? null, name: settings.cashappAccountName ?? null };
     case "paypal":
-      return { handle: settings.paypalHandle ?? null };
+      return { handle: settings.paypalHandle ?? null, name: settings.paypalAccountName ?? null };
     case "venmo":
-      return { handle: settings.venmoHandle ?? null };
+      return { handle: settings.venmoHandle ?? null, name: settings.venmoAccountName ?? null };
     case "zelle":
-      return { handle: settings.zelleHandle ?? null };
+      return { handle: settings.zelleHandle ?? null, name: settings.zelleAccountName ?? null };
   }
 }

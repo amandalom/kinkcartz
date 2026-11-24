@@ -13,18 +13,22 @@ export function buildCustomerOrderEmail(params: {
   order: OrderEmailOrder;
   orderLink: string;
   bitcoinAddress?: string | null;
+  accountName?: string | null;
 }) {
   const method = params.order.paymentMethod as PaymentMethod;
   const label = PAYMENT_METHOD_LABELS[method] ?? method;
   const amount = formatCents(params.order.totalCents);
   const shortId = params.order.id.slice(-8);
 
+  const nameNote = params.accountName
+    ? ` Double-check the account name shown — it should say <strong>${params.accountName}</strong>.`
+    : "";
   const paymentBlock =
     method === "bitcoin"
       ? `Send <strong>${amount}</strong> worth of BTC to:<br/><code>${
           params.bitcoinAddress ?? "(address not configured yet — contact support)"
         }</code>`
-      : `We'll confirm your <strong>${label}</strong> payment destination on the secure page linked below.`;
+      : `We'll confirm your <strong>${label}</strong> payment destination on the secure page linked below.${nameNote}`;
 
   const html = `
     <p>Hi ${params.order.shippingName},</p>

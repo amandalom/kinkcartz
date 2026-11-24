@@ -40,7 +40,11 @@ export default async function OrderPage({
   const method = order.paymentMethod as PaymentMethod;
   const label = PAYMENT_METHOD_LABELS[method] ?? order.paymentMethod;
   const details = order.paymentDetails
-    ? (JSON.parse(order.paymentDetails) as { address?: string | null; handle?: string | null })
+    ? (JSON.parse(order.paymentDetails) as {
+        address?: string | null;
+        handle?: string | null;
+        name?: string | null;
+      })
     : {};
   const destination = details.address ?? details.handle;
 
@@ -55,9 +59,17 @@ export default async function OrderPage({
       <div className="mt-6 rounded-xl border border-white/10 bg-surface p-5">
         <h2 className="text-sm uppercase tracking-wide text-zinc-500">Pay via {label}</h2>
         {destination ? (
-          <p className="mt-3 break-all rounded-lg bg-surface2 px-4 py-3 font-mono text-sm text-white">
-            {destination}
-          </p>
+          <>
+            <p className="mt-3 break-all rounded-lg bg-surface2 px-4 py-3 font-mono text-sm text-white">
+              {destination}
+            </p>
+            {details.name && (
+              <p className="mt-2 text-xs text-zinc-400">
+                Account name on file: <span className="text-zinc-200">{details.name}</span> —
+                confirm this matches before sending.
+              </p>
+            )}
+          </>
         ) : (
           <p className="mt-3 text-sm text-accent">
             Payment destination isn&apos;t configured yet — contact support with your order number.
