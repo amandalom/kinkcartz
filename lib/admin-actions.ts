@@ -10,7 +10,7 @@ import { saveUpload, deleteUpload } from "@/lib/image-storage";
 import { createOrderToken } from "@/lib/order-link";
 import { sendEmail } from "@/lib/email";
 import { buildCustomerOrderEmail } from "@/lib/order-emails";
-import type { PaymentMethod } from "@/lib/payment-methods";
+import { isPaymentMethod, type PaymentMethod } from "@/lib/payment-methods";
 
 async function requireAdmin() {
   const token = (await cookies()).get(ADMIN_COOKIE)?.value;
@@ -193,7 +193,13 @@ export async function sendPaymentDetails(orderId: string, formData: FormData) {
   }
 
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-  const method = order.paymentMethod as PaymentMethod;
+  // The admin can reassign the payment method here too (e.g. a customer
+  // messages asking to switch) — falls back to whatever the customer
+  // picked at checkout if no override is submitted.
+  const methodInput = formData.get("method");
+  const method: PaymentMethod = isPaymentMethod(methodInput)
+    ? methodInput
+    : (order.paymentMethod as PaymentMethod);
   const paymentDetails = JSON.stringify(
     method === "bitcoin"
       ? { address: destination }
@@ -204,6 +210,7 @@ export async function sendPaymentDetails(orderId: string, formData: FormData) {
   const updated = await prisma.order.update({
     where: { id: order.id },
     data: {
+      paymentMethod: method,
       paymentDetails,
       magicTokenHash: hash,
       magicTokenExpiresAt: expiresAt,
@@ -222,6 +229,7 @@ export async function sendPaymentDetails(orderId: string, formData: FormData) {
   await sendEmail(email);
 
   revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${orderId}`);
 }
 
 export async function updatePaymentSettings(formData: FormData) {
