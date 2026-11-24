@@ -7,6 +7,10 @@ const ADMIN_LOGIN_PATHS = ["/admin/login", "/api/admin/login"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Carries the full path + query (e.g. an order magic link's ?token=...)
+  // through the age-gate/login redirect, not just the pathname — otherwise
+  // anything after the "?" gets silently dropped.
+  const target = pathname + req.nextUrl.search;
 
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     if (ADMIN_LOGIN_PATHS.some((p) => pathname.startsWith(p))) {
@@ -23,7 +27,8 @@ export async function proxy(req: NextRequest) {
 
     const url = req.nextUrl.clone();
     url.pathname = "/admin/login";
-    url.searchParams.set("next", pathname);
+    url.search = "";
+    url.searchParams.set("next", target);
     return NextResponse.redirect(url);
   }
 
@@ -36,7 +41,8 @@ export async function proxy(req: NextRequest) {
 
   const url = req.nextUrl.clone();
   url.pathname = "/age-gate";
-  url.searchParams.set("next", pathname);
+  url.search = "";
+  url.searchParams.set("next", target);
   return NextResponse.redirect(url);
 }
 
