@@ -1,12 +1,16 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin-auth";
 import { saveUpload, deleteUpload } from "@/lib/image-storage";
+import { createOrderToken } from "@/lib/order-link";
+import { sendEmail } from "@/lib/email";
+import { buildCustomerOrderEmail } from "@/lib/order-emails";
+import type { PaymentMethod } from "@/lib/payment-methods";
 
 async function requireAdmin() {
   const token = (await cookies()).get(ADMIN_COOKIE)?.value;
@@ -167,6 +171,52 @@ export async function updateOrderStatus(orderId: string, formData: FormData) {
     throw new Error("Invalid status.");
   }
   await prisma.order.update({ where: { id: orderId }, data: { status } });
+  revalidatePath("/admin/orders");
+}
+
+async function getOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
+}
+
+// Admin reviews the order, enters (or confirms) the address/handle the
+// customer should pay, and this is what actually tells the customer where
+// to send money — checkout itself never emails them this.
+export async function sendPaymentDetails(orderId: string, formData: FormData) {
+  await requireAdmin();
+  const destination = String(formData.get("destination") ?? "").trim();
+  if (!destination) {
+    throw new Error("Enter a payment address/handle before sending.");
+  }
+
+  const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+  const method = order.paymentMethod as PaymentMethod;
+  const paymentDetails = JSON.stringify(
+    method === "bitcoin" ? { address: destination } : { handle: destination }
+  );
+
+  const { token, hash, expiresAt } = await createOrderToken(order.id);
+  const updated = await prisma.order.update({
+    where: { id: order.id },
+    data: {
+      paymentDetails,
+      magicTokenHash: hash,
+      magicTokenExpiresAt: expiresAt,
+      paymentDetailsSentAt: new Date(),
+    },
+  });
+
+  const origin = await getOrigin();
+  const orderLink = `${origin}/orders/${order.id}?token=${token}`;
+  const email = buildCustomerOrderEmail({
+    order: updated,
+    orderLink,
+    bitcoinAddress: method === "bitcoin" ? destination : undefined,
+  });
+  await sendEmail(email);
+
   revalidatePath("/admin/orders");
 }
 

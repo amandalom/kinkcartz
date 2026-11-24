@@ -133,13 +133,20 @@ excluded from the age-gate.
 - A cart (Zustand + localStorage) and a checkout page that writes an
   `Order` + `OrderItem` row.
 - Manual payment methods: at checkout the customer picks Bitcoin, Cash App,
-  PayPal, Venmo, or Zelle (admin controls which are enabled and their
-  address/handle at `/admin/settings`). Bitcoin's address shows immediately
-  on-screen; the others are revealed via a secure "magic link" emailed to
-  the customer (`/orders/[id]?token=...`, `lib/order-link.ts`). Every order
-  shows up on `/admin/orders` regardless of email config, with a badge count
-  in the admin nav; admin also gets an email if `ADMIN_NOTIFICATION_EMAIL`
-  is set. See "Email" below.
+  PayPal, Venmo, or Zelle (admin controls which are enabled, and a default
+  address/handle for each, at `/admin/settings`). Checkout itself only
+  emails the admin — the customer isn't told where to pay yet. An admin
+  reviews the order on `/admin/orders`, confirms or edits the destination
+  for that specific order, and clicking "Send" is what emails the customer
+  a secure "magic link" with payment instructions (`/orders/[id]?token=...`,
+  `lib/order-link.ts`, `sendPaymentDetails` in `lib/admin-actions.ts`).
+  Bitcoin is the exception: since payment has to happen *before* the order
+  can be placed (no automatic blockchain verification, so the customer
+  attaches a screenshot as proof), its address shows immediately on-screen
+  at checkout — the admin's "Send" afterward just re-confirms it and
+  releases the order status page. Every order shows up on `/admin/orders`
+  regardless of email config, with a badge count in the admin nav. See
+  "Email" below.
 - An age-gate: every request is redirected to `/age-gate` until a cookie
   is set, enforced in `proxy.ts` (Next's server-side middleware/proxy), not
   just a client-side popup.

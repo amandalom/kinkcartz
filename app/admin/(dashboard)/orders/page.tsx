@@ -1,17 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { formatCents } from "@/lib/format";
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/lib/payment-methods";
-import { updateOrderStatus } from "@/lib/admin-actions";
+import { updateOrderStatus, sendPaymentDetails } from "@/lib/admin-actions";
+import { buildPaymentDetailsSnapshot, getPaymentSettings } from "@/lib/payment-settings";
 
 export const dynamic = "force-dynamic";
 
 const STATUSES = ["pending_payment", "paid", "fulfilled", "cancelled"] as const;
 
 export default async function AdminOrdersPage() {
-  const orders = await prisma.order.findMany({
-    include: { items: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const [orders, paymentSettings] = await Promise.all([
+    prisma.order.findMany({
+      include: { items: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    getPaymentSettings(),
+  ]);
 
   return (
     <div>
@@ -27,7 +31,7 @@ export default async function AdminOrdersPage() {
               <th className="px-4 py-3">Order</th>
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Payment</th>
-              <th className="px-4 py-3">Destination</th>
+              <th className="px-4 py-3">Payment details</th>
               <th className="px-4 py-3">Proof</th>
               <th className="px-4 py-3">Total</th>
               <th className="px-4 py-3">Status</th>
@@ -40,7 +44,12 @@ export default async function AdminOrdersPage() {
               const details = order.paymentDetails
                 ? (JSON.parse(order.paymentDetails) as { address?: string | null; handle?: string | null })
                 : {};
-              const destination = details.address ?? details.handle ?? "—";
+              const sentDestination = details.address ?? details.handle ?? null;
+              const defaultDestination =
+                sentDestination ??
+                buildPaymentDetailsSnapshot(method, paymentSettings).address ??
+                buildPaymentDetailsSnapshot(method, paymentSettings).handle ??
+                "";
 
               return (
                 <tr key={order.id} className="bg-surface/40 align-top">
@@ -58,7 +67,28 @@ export default async function AdminOrdersPage() {
                   </td>
                   <td className="px-4 py-3 text-zinc-300">{label}</td>
                   <td className="px-4 py-3 text-zinc-400">
-                    <span className="break-all font-mono text-xs">{destination}</span>
+                    <form
+                      action={sendPaymentDetails.bind(null, order.id)}
+                      className="flex items-center gap-2"
+                    >
+                      <input
+                        name="destination"
+                        defaultValue={defaultDestination}
+                        placeholder={method === "bitcoin" ? "BTC address" : "Handle"}
+                        className="w-40 rounded-md border border-white/10 bg-surface2 px-2 py-1 font-mono text-xs text-white placeholder:text-zinc-600"
+                      />
+                      <button
+                        type="submit"
+                        className="whitespace-nowrap rounded-md border border-white/15 px-2 py-1 text-xs text-zinc-300 hover:bg-white/5"
+                      >
+                        {order.paymentDetailsSentAt ? "Resend" : "Send"}
+                      </button>
+                    </form>
+                    <p className="mt-1 text-xs text-zinc-600">
+                      {order.paymentDetailsSentAt
+                        ? `Sent to customer ${order.paymentDetailsSentAt.toLocaleString()}`
+                        : "Not sent to customer yet"}
+                    </p>
                   </td>
                   <td className="px-4 py-3">
                     {order.paymentProofKey ? (

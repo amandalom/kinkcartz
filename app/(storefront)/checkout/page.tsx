@@ -91,14 +91,15 @@ export default function CheckoutPage() {
               We&apos;ve got your screenshot for the{" "}
               <strong className="text-gold">{formatCents(orderTotal)}</strong> payment — we&apos;ll
               double-check it and get your order packed and shipped as soon as it&apos;s confirmed.
-              We&apos;ll also email you this address and a link to check your order status.
+              We&apos;ll email you a link to check your order status once we&apos;ve reviewed it.
             </p>
           </div>
         ) : (
           <p className="mt-4 text-sm text-zinc-400">
-            We&apos;ll email you a secure magic link with{" "}
-            {method && PAYMENT_METHOD_LABELS[method as PaymentMethod]} payment instructions in a
-            few minutes. Your order ships as soon as we&apos;ve confirmed the payment came through.
+            We&apos;re reviewing your order now — once that&apos;s done we&apos;ll email you a
+            secure magic link with{" "}
+            {method && PAYMENT_METHOD_LABELS[method as PaymentMethod]} payment instructions. Your
+            order ships as soon as we&apos;ve confirmed the payment came through.
           </p>
         )}
       </main>
@@ -188,9 +189,9 @@ export default function CheckoutPage() {
             )}
             {method && method !== "bitcoin" && (
               <p className="text-xs text-zinc-500">
-                We&apos;ll send a secure magic link to your email with{" "}
-                {PAYMENT_METHOD_LABELS[method as PaymentMethod]} payment instructions once you
-                place the order.
+                Once you place the order, we&apos;ll review it and send a secure magic link to
+                your email with {PAYMENT_METHOD_LABELS[method as PaymentMethod]} payment
+                instructions.
               </p>
             )}
           </div>

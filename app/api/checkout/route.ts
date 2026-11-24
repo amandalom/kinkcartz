@@ -2,10 +2,9 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isPaymentMethod } from "@/lib/payment-methods";
-import { buildPaymentDetailsSnapshot, getPaymentSettings, isMethodEnabled } from "@/lib/payment-settings";
-import { createOrderToken } from "@/lib/order-link";
+import { getPaymentSettings, isMethodEnabled } from "@/lib/payment-settings";
 import { sendEmail } from "@/lib/email";
-import { buildAdminNotificationEmail, buildCustomerOrderEmail } from "@/lib/order-emails";
+import { buildAdminNotificationEmail } from "@/lib/order-emails";
 import { savePaymentProof } from "@/lib/payment-proof-storage";
 
 const MAX_PROOF_BYTES = 5 * 1024 * 1024;
@@ -73,7 +72,6 @@ export async function POST(req: NextRequest) {
   }
 
   const totalCents = items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
-  const paymentDetails = buildPaymentDetailsSnapshot(paymentMethod, settings);
 
   const order = await prisma.order.create({
     data: {
@@ -87,7 +85,9 @@ export async function POST(req: NextRequest) {
       shippingCountry: shipping.country,
       totalCents,
       paymentMethod,
-      paymentDetails: JSON.stringify(paymentDetails),
+      // Not set here — an admin fills this in and sends it to the customer
+      // from /admin/orders once they've reviewed the order.
+      paymentDetails: null,
       paymentProofKey,
       items: {
         create: items.map((i) => ({
@@ -101,25 +101,12 @@ export async function POST(req: NextRequest) {
     include: { items: true },
   });
 
-  const { token, hash, expiresAt } = await createOrderToken(order.id);
-  await prisma.order.update({
-    where: { id: order.id },
-    data: { magicTokenHash: hash, magicTokenExpiresAt: expiresAt },
-  });
-
   const origin = req.nextUrl.origin;
-  const orderLink = `${origin}/orders/${order.id}?token=${token}`;
 
-  // Best-effort notifications — a failed email must never roll back an
-  // already-recorded order.
+  // Best-effort notification — a failed email must never roll back an
+  // already-recorded order. The customer isn't emailed yet: an admin
+  // reviews the order and sends payment details from /admin/orders first.
   try {
-    const customerEmail = buildCustomerOrderEmail({
-      order,
-      orderLink,
-      bitcoinAddress: paymentMethod === "bitcoin" ? settings.bitcoinAddress : undefined,
-    });
-    await sendEmail(customerEmail);
-
     const adminTo = process.env.ADMIN_NOTIFICATION_EMAIL;
     if (adminTo) {
       const adminEmail = buildAdminNotificationEmail({
@@ -129,7 +116,7 @@ export async function POST(req: NextRequest) {
       await sendEmail({ ...adminEmail, to: adminTo });
     }
   } catch (err) {
-    console.error("[checkout] notification emails failed", err);
+    console.error("[checkout] admin notification email failed", err);
   }
 
   return NextResponse.json({ orderId: order.id });

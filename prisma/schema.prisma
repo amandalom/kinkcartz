@@ -92,10 +92,14 @@ model Order {
   status            String      @default("pending_payment")
   billingDescriptor String      @default("KCZ* RETAIL")
   paymentMethod     String      @default("bitcoin") // "bitcoin" | "cashapp" | "paypal" | "venmo" | "zelle"
-  // JSON snapshot of the address/handle shown to the customer at order
-  // time, so a later admin edit to PaymentSettings can't change what an
-  // already-placed order is expecting payment to.
+  // JSON { address } or { handle } — set by an admin via "Send payment
+  // details" on /admin/orders, not auto-filled from PaymentSettings at
+  // checkout, so the admin reviews each order before the customer is told
+  // where to pay. Null until that happens.
   paymentDetails    String?
+  // When the admin sent the customer their payment-details email. Null
+  // means the customer hasn't been told where to pay yet.
+  paymentDetailsSentAt DateTime?
   magicTokenHash       String?
   magicTokenExpiresAt  DateTime?
   // Key into the private payment-proofs store (lib/payment-proof-storage.ts)
